@@ -128,7 +128,7 @@ class CollaborativeFiltering():
 
         ind = np.argsort(-1 * self.rating_matrix, axis = 1)
 
-        for i in range(self.num_users):
+        for i in range(self.num_users // 4):
 
             num, den = 0.0, 0.0
             for j in range(k):
@@ -178,5 +178,5 @@ if __name__ == "__main__":
     """
         Collaborative RMSE 0.8452675603293487
         Collaborative Spearmans Rank Correlation 0.9999999240526046
-        Collaborative Precision On TopK 0.9091970463737955
+        Collaborative Precision On TopK 0.9024871794603606
     """
