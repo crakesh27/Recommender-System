@@ -98,7 +98,7 @@ class CollaborativeFiltering():
             except:
                 return 0
 
-    def RMSEandSpearman(self):
+    def rmse_spearmans_rank_correlation(self):
         diff = 0.0
         num_pred = 0
         rows = self.num_users // 4
@@ -116,7 +116,7 @@ class CollaborativeFiltering():
         print('Collaborative RMSE', rmse)
         print('Collaborative Spearmans Rank Correlation', rankcor)
 
-    def precisionOnTopK(self):
+    def precision_on_topk(self):
         """
             Precision On Top K for Collaborative filtering
         """
@@ -173,8 +173,8 @@ if __name__ == "__main__":
     user_movie_rating_matrix = get_user_movie_rating_matrix()
 
     recommender = CollaborativeFiltering(user_movie_rating_matrix)
-    recommender.RMSEandSpearman()
-    recommender.precisionOnTopK()
+    recommender.rmse_spearmans_rank_correlation()
+    recommender.precision_on_topk()
     """
         Collaborative RMSE 0.8452675603293487
         Collaborative Spearmans Rank Correlation 0.9999999240526046
