@@ -40,6 +40,10 @@ def get_user_movie_rating_matrix():
 
 
 def rmse_spearmans_rank_correlation(recommender):
+    """
+        Root mean square error and Spearman's rank correlation
+        Lower the RMSE and rank correlation close to 1, better the algorithm
+    """
     diff = 0.0
     num_pred = 0
     rows = recommender.num_users // 4
@@ -171,8 +175,7 @@ class CollaborativeFiltering():
 
 class CollaborativeFilteringBaseline():
     """
-        Predicts the ratings of first quater of user movie matrix and
-        calculates RMSE, Rank Correlation using Baseline estimate Collaborative Filtering
+        Predicts the ratings of first quater of user movie matrix using Baseline estimate Collaborative Filtering
     """
 
     def __init__(self, rating_matrix):
@@ -267,11 +270,29 @@ class CollaborativeFilteringBaseline():
         if denom != 0:
             return bxi + num/denom
         else:
-            try:
-                return self.rating_matrix[x].sum()/len(np.flatnonzero(self.rating_matrix[x]))
-            except:
-                return 0
+            return bxi
 
+class SingularValueDecomposition():
+    """
+        Predicts the ratings of first quater of user movie matrix using Singular Value Decomposition
+    """
+
+    def __init__(self, rating_matrix):
+        self.rating_matrix = rating_matrix
+        self.num_users = self.rating_matrix.shape[0]
+        self.num_movies = self.rating_matrix.shape[1]
+
+        self.generated_rating_matrix = np.ndarray(shape=(self.num_users, self.num_movies))
+
+        print(type(self.generated_rating_matrix))
+        print(self.generated_rating_matrix)
+
+    def svd(self):
+        # implement
+        return
+
+    def predict_rating(self, x, i):
+        return self.generated_rating_matrix[x][i]
 
 if __name__ == "__main__":
 
@@ -292,5 +313,9 @@ if __name__ == "__main__":
     """
         CollaborativeFilteringBaseline RMSE 0.7675328677210587
         CollaborativeFilteringBaseline Spearmans Rank Correlation 0.9999999373792241
-        CollaborativeFilteringBaseline Precision On TopK 0.8851800349362141
+        CollaborativeFilteringBaseline Precision On TopK 0.8839798773318012
     """
+
+    recommender = SingularValueDecomposition(user_movie_rating_matrix)
+    rmse_spearmans_rank_correlation(recommender)
+    precision_on_topk(recommender)
