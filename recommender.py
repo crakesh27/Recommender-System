@@ -1,8 +1,9 @@
+from re import S
 import pandas as pd
 import numpy as np
 import math
 import pickle
-
+from scipy import linalg
 
 def load_pkl(s):
     """
@@ -54,6 +55,9 @@ def rmse_spearmans_rank_correlation(recommender):
                 diff += ((recommender.predict_rating(i, j) -
                           recommender.rating_matrix[i][j])**2)
                 num_pred += 1
+
+                # print(recommender.predict_rating(i, j))
+                # print(recommender.rating_matrix[i][j])
 
     rmse = math.sqrt(diff/num_pred)
     rankcor = 1-((6*diff)/(num_pred*((num_pred**2)-1)))
@@ -282,17 +286,46 @@ class SingularValueDecomposition():
         self.num_users = self.rating_matrix.shape[0]
         self.num_movies = self.rating_matrix.shape[1]
 
-        self.generated_rating_matrix = np.ndarray(shape=(self.num_users, self.num_movies))
-
-        print(type(self.generated_rating_matrix))
-        print(self.generated_rating_matrix)
+        self.generated_rating_matrix = self.svd()
 
     def svd(self):
-        # implement
-        return
+        A = self.rating_matrix.copy()
+        AT = self.rating_matrix.copy().transpose()
+
+        ATA = AT.dot(A)
+
+        e_vals, e_vecs = linalg.eig(ATA)           #Returns the Eigen values and eigen vectors for Atranspose*A
+
+        mod_e_vals=[(i, abs(e_vals[i])) for i in range(len(e_vals))]
+        mod_e_vals.sort(key=lambda x: x[1], reverse=True)
+
+        # Compute sigma
+        sigma = np.ndarray(shape=(self.num_users, self.num_movies))
+        for i in range(self.num_users):						#filling the diagonal elements of Sigma matrix with square root of eigen values in descending order
+            sigma[i][i] = math.sqrt(mod_e_vals[i][1])
+
+        # Compute V
+        V = np.matrix(e_vecs)
+        e_val_order = [e[0] for e in mod_e_vals]
+        V = V [:, e_val_order]
+        VT = V.transpose()
+
+        # Compute U
+        AV = A.dot(V)
+        U = np.zeros((self.num_users, self.num_users))
+        for i in range (self.num_users):
+            try:
+                U[:, i] = np.array(AV[:, i]).flatten()/sigma[i][i]
+                U[:, i] /= math.sqrt(U[:, i].dot(U[:, i]))
+            except:
+                continue
+
+        # SVD = U * sigm * VT
+        SVD_matrix = U.dot(sigma.dot(VT))
+        return SVD_matrix
 
     def predict_rating(self, x, i):
-        return self.generated_rating_matrix[x][i]
+        return abs(self.generated_rating_matrix.item((x,i)))
 
 if __name__ == "__main__":
 
@@ -319,3 +352,8 @@ if __name__ == "__main__":
     recommender = SingularValueDecomposition(user_movie_rating_matrix)
     rmse_spearmans_rank_correlation(recommender)
     precision_on_topk(recommender)
+    """
+        SingularValueDecomposition RMSE 0.02956619042084224
+        SingularValueDecomposition Spearmans Rank Correlation 0.9999999999070787
+        SingularValueDecomposition Precision On TopK 0.8819036887534969
+    """

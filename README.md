@@ -5,6 +5,7 @@ Implementation of various recommendation algorithms such as Collaborative filter
 * python
 * numpy
 * pandas
+* scipy
 
 ## Run
 
