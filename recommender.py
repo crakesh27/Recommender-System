@@ -1,9 +1,7 @@
-from re import S
 import pandas as pd
 import numpy as np
 import math
 import pickle
-from scipy import linalg
 
 def load_pkl(s):
     """
@@ -81,12 +79,13 @@ def precision_on_topk(recommender):
     for i in range(recommender.num_users // 4):
 
         num, den = 0.0, 0.0
+        eps = 0.00001
         for j in range(k):
             movie_index = ind[i][j]
             if(recommender.rating_matrix[i][movie_index] >= relevance):
                 den += 1
                 pred_value = recommender.predict_rating(i, movie_index)
-                if(pred_value >= relevance):
+                if(pred_value >= relevance - eps):
                     num += 1
 
         try:
@@ -294,14 +293,14 @@ class SingularValueDecomposition():
 
         ATA = AT.dot(A)
 
-        e_vals, e_vecs = linalg.eig(ATA)           #Returns the Eigen values and eigen vectors for Atranspose*A
+        e_vals, e_vecs = np.linalg.eig(ATA)           # Returns the Eigen values and eigen vectors for Atranspose*A
 
         mod_e_vals=[(i, abs(e_vals[i])) for i in range(len(e_vals))]
         mod_e_vals.sort(key=lambda x: x[1], reverse=True)
 
         # Compute sigma
         sigma = np.ndarray(shape=(self.num_users, self.num_movies))
-        for i in range(self.num_users):						#filling the diagonal elements of Sigma matrix with square root of eigen values in descending order
+        for i in range(self.num_users):						# filling the diagonal elements of Sigma matrix with square root of eigen values in descending order
             sigma[i][i] = math.sqrt(mod_e_vals[i][1])
 
         # Compute V
@@ -326,6 +325,100 @@ class SingularValueDecomposition():
 
     def predict_rating(self, x, i):
         return abs(self.generated_rating_matrix.item((x,i)))
+
+class CUR():
+    """
+        Predicts the ratings of first quater of user movie matrix using CUR
+    """
+
+    def __init__(self, rating_matrix):
+        self.rating_matrix = rating_matrix
+        self.num_users = self.rating_matrix.shape[0]
+        self.num_movies = self.rating_matrix.shape[1]
+
+        self.generated_rating_matrix = self.cur()
+
+    def svd(self, matrix):
+        A = matrix.copy()
+        AT = matrix.copy().transpose()
+
+        num_rows = matrix.shape[0]
+        num_cols = matrix.shape[1]
+
+        ATA = AT.dot(A)
+
+        e_vals, e_vecs = np.linalg.eig(ATA)           #Returns the Eigen values and eigen vectors for Atranspose*A
+
+        mod_e_vals=[(i, abs(e_vals[i])) for i in range(len(e_vals))]
+        mod_e_vals.sort(key=lambda x: x[1], reverse=True)
+
+        # Compute sigma
+        sigma = np.ndarray(shape=(num_rows, num_cols))
+        for i in range(num_rows):						#filling the diagonal elements of Sigma matrix with square root of eigen values in descending order
+            sigma[i][i] = math.sqrt(mod_e_vals[i][1])
+
+        # Compute V
+        V = np.matrix(e_vecs)
+        e_val_order = [e[0] for e in mod_e_vals]
+        V = V [:, e_val_order]
+        VT = V.transpose()
+
+        # Compute U
+        AV = A.dot(V)
+        U = np.zeros((num_rows, num_rows))
+        for i in range (num_rows):
+            try:
+                U[:, i] = np.array(AV[:, i]).flatten()/sigma[i][i]
+                U[:, i] /= math.sqrt(U[:, i].dot(U[:, i]))
+            except:
+                continue
+
+        return U, sigma, VT
+
+    def cur(self):
+        sample_size = 100
+
+        # Sampling columns - C
+        matrix_sum = (self.rating_matrix**2).sum()
+        col_prob = (self.rating_matrix**2).sum(axis=0)
+        col_prob /= matrix_sum
+
+        col_indices = np.random.choice(np.arange(0,self.num_movies), size=sample_size, replace=True, p=col_prob)
+        C = self.rating_matrix.copy()[:,col_indices]
+        C = np.divide(C,(sample_size*col_prob[col_indices])**0.5)
+
+        # Sampling rows - R
+        row_prob = (self.rating_matrix**2).sum(axis=1)
+        row_prob /= matrix_sum
+
+        row_indices = np.random.choice(np.arange(0,self.num_users), size=sample_size, replace=True, p=row_prob)
+        R = self.rating_matrix.copy()[row_indices, :]
+        R = np.divide(R, np.array([(sample_size*row_prob[row_indices])**0.5]).transpose())
+
+        # Finding U
+
+        # W - intersection of sampled C and R
+        W = self.rating_matrix.copy()[:, col_indices]
+        W = W[row_indices, :]
+
+        X, Z, YT = self.svd(W)
+
+        for i in range(min(Z.shape[0],Z.shape[1])):
+            if (Z[i][i] != 0):
+                Z[i][i] = 1/Z[i][i]
+
+        Y = YT.transpose()
+        XT = X.transpose()
+
+        U = Y.dot(Z.dot(XT))
+
+        # CUR = C * U * R
+        CUR_matrix = C.dot(U.dot(R))
+        return CUR_matrix
+
+    def predict_rating(self, x, i):
+        return max(0, min(5, abs(self.generated_rating_matrix.item((x,i)))))
+
 
 if __name__ == "__main__":
 
@@ -353,7 +446,16 @@ if __name__ == "__main__":
     rmse_spearmans_rank_correlation(recommender)
     precision_on_topk(recommender)
     """
-        SingularValueDecomposition RMSE 0.02956619042084224
-        SingularValueDecomposition Spearmans Rank Correlation 0.9999999999070787
-        SingularValueDecomposition Precision On TopK 0.8819036887534969
+        SingularValueDecomposition RMSE 3.780525477770839e-13
+        SingularValueDecomposition Spearmans Rank Correlation 1.0
+        SingularValueDecomposition Precision On TopK 1.0
+    """
+
+    recommender = CUR(user_movie_rating_matrix)
+    rmse_spearmans_rank_correlation(recommender)
+    precision_on_topk(recommender)
+    """
+        CUR RMSE 1.7448751755958805
+        CUR Spearmans Rank Correlation 0.999999676366695
+        CUR Precision On TopK 1.0
     """
